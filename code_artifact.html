@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Волшебный Сундук с Секретом</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Comfortaa:wght@600;700&family=Marcellus&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Comfortaa', cursive, sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            background: #080d07;
+            color: #fef08a;
+            overflow-x: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Сказочный фон с глубокими тонами */
+        .magic-bg {
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(circle at 50% 30%, rgba(254, 240, 138, 0.15) 0%, rgba(180, 83, 9, 0.1) 40%, transparent 80%),
+                radial-gradient(circle at 20% 80%, rgba(20, 83, 45, 0.3) 0%, transparent 60%),
+                linear-gradient(180deg, #040904 0%, #0d1a0e 50%, #050804 100%);
+            z-index: 0;
+        }
+
+        /* Canvas для фоновых искорок */
+        #sparkle-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Главная сцена с картинкой сундука */
+        .chest-container {
+            position: relative;
+            width: 100%;
+            max-width: 580px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        /* Картинки сундука с плавным переключением */
+        .chest-img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 16px;
+            transition: opacity 1.2s ease-in-out, transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.8));
+        }
+
+        .chest-closed {
+            opacity: 1;
+            z-index: 12;
+        }
+
+        .chest-open {
+            opacity: 0;
+            z-index: 11;
+            transform: scale(1.02);
+        }
+
+        /* Состояние открытого сундука */
+        .chest-container.opened .chest-closed {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .chest-container.opened .chest-open {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+
+        /* Анимация встряски перед открытием */
+        @keyframes unlockShake {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            20% { transform: scale(1.03) rotate(-2deg); }
+            40% { transform: scale(1.03) rotate(2deg); }
+            60% { transform: scale(1.05) rotate(-1deg); }
+            80% { transform: scale(1.05) rotate(1deg); }
+        }
+
+        .chest-container.shaking {
+            animation: unlockShake 0.6s ease-in-out;
+        }
+
+        /* Замок с вводом даты поверх центральной части сундука */
+        .lock-overlay {
+            position: absolute;
+            top: 51.5%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .lock-plate {
+            background: linear-gradient(135deg, rgba(30, 15, 5, 0.92) 0%, rgba(60, 30, 10, 0.95) 100%);
+            border: 2px solid #fbbf24;
+            border-radius: 12px;
+            padding: 8px 14px;
+            box-shadow: 
+                0 0 20px rgba(245, 158, 11, 0.4),
+                0 10px 25px rgba(0, 0, 0, 0.9),
+                inset 0 0 10px rgba(251, 191, 36, 0.2);
+            backdrop-filter: blur(4px);
+            text-align: center;
+        }
+
+        .lock-input {
+            background: rgba(10, 5, 0, 0.85);
+            border: 1.5px solid #fef08a;
+            border-radius: 8px;
+            color: #fef08a;
+            font-family: 'Marcellus', serif;
+            font-size: 1.25rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-align: center;
+            width: 140px;
+            padding: 4px 6px;
+            outline: none;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.9);
+            text-shadow: 0 0 8px rgba(253, 224, 71, 0.7);
+            transition: all 0.3s ease;
+        }
+
+        .lock-input:focus {
+            border-color: #f59e0b;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.9), 0 0 12px rgba(245, 158, 11, 0.6);
+        }
+
+        .lock-overlay.hidden-lock {
+            opacity: 0;
+            transform: translate(-50%, -30%) scale(0.7);
+            pointer-events: none;
+        }
+
+        /* Вылетающее письмо с картинкой letter.jpg */
+        .letter-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.1);
+            width: 92vw;
+            max-width: 440px;
+            aspect-ratio: 9 / 16;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 1.1s cubic-bezier(0.175, 0.885, 0.32, 1.2);
+            filter: drop-shadow(0 25px 50px rgba(0,0,0,0.9));
+        }
+
+        .letter-modal.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .letter-bg-img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+            border-radius: 12px;
+        }
+
+        /* Текст внутри пергамента */
+        .letter-content {
+            position: absolute;
+            inset: 15% 12% 12% 12%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            color: #2b1704;
+            font-family: 'Caveat', cursive;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        /* Стилизация скроллбара внутри свитка */
+        .letter-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .letter-content::-webkit-scrollbar-thumb {
+            background: rgba(120, 53, 15, 0.4);
+            border-radius: 4px;
+        }
+
+        /* Вылетающие золотые частицы при открытии */
+        .burst-particle {
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 90;
+            animation: particleFly 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+
+        @keyframes particleFly {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1.2);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--dx), var(--dy)) scale(0);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="magic-bg"></div>
+    <canvas id="sparkle-canvas"></canvas>
+
+    <!-- Основная секция -->
+    <main class="relative z-10 flex flex-col items-center justify-center min-h-screen w-full p-4">
+        
+        <!-- Заголовок -->
+        <div id="header-text" class="text-center mb-2 transition-opacity duration-700">
+            <h1 class="text-2xl md:text-4xl font-bold text-amber-200 drop-shadow-[0_4px_12px_rgba(245,158,11,0.6)] font-['Marcellus']">
+                Тайна Волшебного Сундука
+            </h1>
+            <p class="text-amber-100/70 text-xs md:text-sm mt-1">
+                Введите дату на кодовом замке, чтобы открыть клад
+            </p>
+        </div>
+
+        <!-- Контейнер с изображениями сундука -->
+        <div class="chest-container" id="chest-container">
+            <!-- Закрытый сундук (chest_closed.png) -->
+            <img 
+                src="chest_closed.png" 
+                alt="Закрытый сундук" 
+                class="chest-img chest-closed"
+                onerror="this.src='https://placehold.co/600x600/1a0f05/fef08a?text=chest_closed.png+не+найден'"
+            />
+
+            <!-- Открытый сундук (chest_open.jpg) -->
+            <img 
+                src="chest_open.jpg" 
+                alt="Открытый сундук" 
+                class="chest-img chest-open"
+                onerror="this.src='https://placehold.co/600x600/2a1a08/fef08a?text=chest_open.jpg+не+найден'"
+            />
+
+            <!-- Замок поверх картинки сундука -->
+            <div class="lock-overlay" id="lock-overlay">
+                <div class="lock-plate">
+                    <div class="text-[10px] text-amber-300 font-bold uppercase tracking-widest mb-1">
+                        🔒 Замок
+                    </div>
+                    <input 
+                        type="text" 
+                        id="date-input" 
+                        class="lock-input" 
+                        placeholder="__.__.____" 
+                        maxlength="10" 
+                        autocomplete="off"
+                    />
+                    <div id="error-msg" class="text-[10px] text-red-400 font-bold mt-1 opacity-0 transition-opacity">
+                        Неверный код!
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Оверлей Свитка с Экспериментом (letter.jpg) -->
+        <div class="letter-modal" id="letter-modal">
+            <!-- Фон старинного свитка -->
+            <img 
+                src="letter.jpg" 
+                alt="Старинный свиток" 
+                class="letter-bg-img"
+                onerror="this.src='https://placehold.co/400x700/3a200a/fef08a?text=letter.jpg+не+найден'"
+            />
+
+            <!-- Текст эксперимента поверх свитка -->
+            <div class="letter-content">
+                <h2 class="text-2xl md:text-3xl font-bold text-amber-950 text-center mb-3 leading-tight border-b-2 border-amber-900/30 pb-1">
+                    Невидимые чернила
+                </h2>
+
+                <div class="space-y-3 text-base md:text-xl font-bold leading-snug">
+                    <div class="bg-amber-950/10 p-2.5 rounded-lg border border-amber-900/20">
+                        <span class="text-amber-900 block text-lg md:text-2xl mb-0.5">📌 Что нужно:</span>
+                        <p class="text-amber-950 font-semibold text-sm md:text-lg">
+                            Молоко или свежий лимонный сок, ватная палочка, белый лист бумаги, источник тепла (свечка).
+                        </p>
+                    </div>
+
+                    <div class="bg-amber-950/10 p-2.5 rounded-lg border border-amber-900/20">
+                        <span class="text-amber-900 block text-lg md:text-2xl mb-0.5">🔥 Как делать:</span>
+                        <p class="text-amber-950 font-semibold text-sm md:text-lg">
+                            Напишите или нарисуйте что-нибудь на бумаге с помощью ватной палочки, смоченной в молоке или лимонном соке. Дайте высохнуть (надпись исчезнет). Прогрейте лист над свечкой — буквы станут коричневыми и проявятся.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Кнопка закрытия -->
+                <div class="mt-4 text-center">
+                    <button 
+                        id="close-btn" 
+                        class="bg-amber-900/80 hover:bg-amber-950 text-amber-100 font-sans font-bold text-xs px-5 py-2 rounded-full shadow-lg transition active:scale-95 border border-amber-600/40">
+                        Закрыть сундук
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const dateInput = document.getElementById('date-input');
+        const lockOverlay = document.getElementById('lock-overlay');
+        const chestContainer = document.getElementById('chest-container');
+        const letterModal = document.getElementById('letter-modal');
+        const errorMsg = document.getElementById('error-msg');
+        const headerText = document.getElementById('header-text');
+        const closeBtn = document.getElementById('close-btn');
+
+        const TARGET_DATE = '02082022'; // Дата без точек (02.08.2022)
+
+        // Маска ввода даты __.__.____
+        dateInput.addEventListener('input', (e) => {
+            let digits = e.target.value.replace(/\D/g, '');
+
+            if (digits.length > 8) digits = digits.substring(0, 8);
+
+            let formatted = '';
+            if (digits.length > 0) {
+                formatted += digits.substring(0, 2);
+                if (digits.length >= 3) formatted += '.' + digits.substring(2, 4);
+                if (digits.length >= 5) formatted += '.' + digits.substring(4, 8);
+            }
+
+            e.target.value = formatted;
+
+            // Проверка правильности введенного кода
+            if (digits === TARGET_DATE) {
+                errorMsg.classList.add('opacity-0');
+                unlockSequence();
+            } else if (digits.length === 8) {
+                errorMsg.classList.remove('opacity-0');
+            } else {
+                errorMsg.classList.add('opacity-0');
+            }
+        });
+
+        // Запрет символов кроме цифр
+        dateInput.addEventListener('keydown', (e) => {
+            if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+            if (!/\d/.test(e.key)) e.preventDefault();
+        });
+
+        // Последовательность анимации открытия
+        function unlockSequence() {
+            dateInput.blur();
+            dateInput.disabled = true;
+
+            // 1. Исчезает замок
+            lockOverlay.classList.add('hidden-lock');
+
+            // 2. Сундук слегка дрожит и открывается
+            setTimeout(() => {
+                chestContainer.classList.add('shaking');
+                setTimeout(() => {
+                    chestContainer.classList.remove('shaking');
+                    chestContainer.classList.add('opened');
+                    createParticlesBurst();
+                }, 300);
+            }, 300);
+
+            // 3. Из сундука вылетает письмо
+            setTimeout(() => {
+                letterModal.classList.add('show');
+                headerText.style.opacity = '0.3';
+            }, 1200);
+        }
+
+        // Возврат в начальное состояние
+        function resetChest() {
+            letterModal.classList.remove('show');
+            headerText.style.opacity = '1';
+
+            setTimeout(() => {
+                chestContainer.classList.remove('opened');
+            }, 400);
+
+            setTimeout(() => {
+                lockOverlay.classList.remove('hidden-lock');
+                dateInput.disabled = false;
+                dateInput.value = '';
+                dateInput.focus();
+            }, 1000);
+        }
+
+        closeBtn.addEventListener('click', resetChest);
+
+        // Салют золотых искорок при открытии
+        function createParticlesBurst() {
+            const count = 40;
+            const rect = chestContainer.getBoundingClientRect();
+            const startX = rect.left + rect.width / 2;
+            const startY = rect.top + rect.height / 2;
+
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    const spark = document.createElement('div');
+                    spark.className = 'burst-particle';
+
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = 80 + Math.random() * 160;
+                    const dx = Math.cos(angle) * distance;
+                    const dy = Math.sin(angle) * distance - 60;
+
+                    spark.style.left = `${startX}px`;
+                    spark.style.top = `${startY}px`;
+                    spark.style.setProperty('--dx', `${dx}px`);
+                    spark.style.setProperty('--dy', `${dy}px`);
+
+                    const colors = ['#ffffff', '#fef08a', '#fde047', '#f59e0b', '#fbbf24'];
+                    spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+                    spark.style.boxShadow = `0 0 10px ${spark.style.background}`;
+
+                    document.body.appendChild(spark);
+                    setTimeout(() => spark.remove(), 2000);
+                }, i * 20);
+            }
+        }
+
+        // Фоновые искорки на Canvas
+        const canvas = document.getElementById('sparkle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height + Math.random() * 20;
+                this.size = Math.random() * 2.5 + 0.8;
+                this.speedY = Math.random() * 0.6 + 0.2;
+                this.speedX = (Math.random() - 0.5) * 0.4;
+                this.alpha = Math.random() * 0.7 + 0.3;
+            }
+            update() {
+                this.y -= this.speedY;
+                this.x += this.speedX;
+                if (this.y < -10) this.reset();
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(254, 240, 138, ${this.alpha})`;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = '#f59e0b';
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < 35; i++) {
+            particles.push(new Particle());
+        }
+
+        function animateCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animateCanvas);
+        }
+        animateCanvas();
+    </script>
+</body>
+</html>
